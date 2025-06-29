@@ -11,9 +11,9 @@ import json
 import os
 import random
 from pathlib import Path
-from typing import Dict, List, Tuple
-from dotenv import load_dotenv
+from typing import Any
 
+from dotenv import load_dotenv
 from openai import OpenAI
 
 
@@ -37,7 +37,7 @@ class PromptGenerator:
         self.client = OpenAI(api_key=api_key)
         print(f"Using OpenAI model: {model_name}")
 
-    def get_prompt_templates(self) -> Dict[str, List[str]]:
+    def get_prompt_templates(self) -> dict[str, list[str]]:
         """Return categorized prompt templates for generation."""
         return {
             "code": [
@@ -89,16 +89,16 @@ class PromptGenerator:
                 "I'm having trouble with",
                 "Could you guide me through",
                 "What's the best approach to",
-            ]
+            ],
         }
 
-    def generate_prompt(self, template: str, target_length: str) -> Tuple[str, int]:
+    def generate_prompt(self, template: str, target_length: str) -> tuple[str, int]:
         """Generate a single prompt from template with target length."""
         # Set target word count based on target length
         length_descriptions = {
             "short": "10-20 words",
             "medium": "30-80 words",
-            "long": "100-200 words"
+            "long": "100-200 words",
         }
         target_desc = length_descriptions.get(target_length, "30-80 words")
 
@@ -110,18 +110,23 @@ class PromptGenerator:
 
         try:
             # Make API call with deterministic seed
+            seed = int(self.seed + hash(template) % 1000)
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": template}
+                    {"role": "user", "content": template},
                 ],
                 max_tokens=300,
                 temperature=0.7,
-                seed=self.seed + hash(template) % 1000  # Deterministic but varied
+                seed=seed,
             )
 
-            generated_text = response.choices[0].message.content.strip()
+            generated_text = response.choices[0].message.content
+            if generated_text is None:
+                generated_text = template
+            else:
+                generated_text = generated_text.strip()
 
             # Estimate token count (rough approximation: 1 token ≈ 0.75 words)
             word_count = len(generated_text.split())
@@ -134,7 +139,7 @@ class PromptGenerator:
             # Fallback to template if API fails
             return template, len(template.split())
 
-    def generate_corpus(self, n_prompts: int = 500) -> List[Dict]:
+    def generate_corpus(self, n_prompts: int = 500) -> list[dict[str, Any]]:
         """Generate complete prompt corpus with distribution across categories and lengths."""
         templates = self.get_prompt_templates()
         categories = list(templates.keys())
@@ -162,13 +167,15 @@ class PromptGenerator:
                     try:
                         prompt_text, token_count = self.generate_prompt(template, length)
 
-                        corpus.append({
-                            "id": prompt_id,
-                            "prompt": prompt_text,
-                            "category": category,
-                            "target_length": length,
-                            "estimated_tokens": token_count
-                        })
+                        corpus.append(
+                            {
+                                "id": prompt_id,
+                                "prompt": prompt_text,
+                                "category": category,
+                                "target_length": length,
+                                "estimated_tokens": token_count,
+                            }
+                        )
 
                         prompt_id += 1
 
@@ -188,13 +195,15 @@ class PromptGenerator:
 
             try:
                 prompt_text, token_count = self.generate_prompt(template, length)
-                corpus.append({
-                    "id": len(corpus),
-                    "prompt": prompt_text,
-                    "category": category,
-                    "target_length": length,
-                    "estimated_tokens": token_count
-                })
+                corpus.append(
+                    {
+                        "id": len(corpus),
+                        "prompt": prompt_text,
+                        "category": category,
+                        "target_length": length,
+                        "estimated_tokens": token_count,
+                    }
+                )
             except Exception as e:
                 print(f"Warning: Failed to generate filler prompt: {e}")
                 break
@@ -202,27 +211,27 @@ class PromptGenerator:
         print(f"Generated {len(corpus)} prompts successfully")
         return corpus
 
-    def save_corpus(self, corpus: List[Dict], output_path: Path) -> None:
+    def save_corpus(self, corpus: list[dict[str, Any]], output_path: Path) -> None:
         """Save corpus to JSONL format."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_path, 'w') as f:
+        with open(output_path, "a") as f:
             for prompt_data in corpus:
-                f.write(json.dumps(prompt_data) + '\n')
+                f.write(json.dumps(prompt_data) + "\n")
 
         print(f"Saved {len(corpus)} prompts to {output_path}")
 
         # Print summary statistics
-        categories = {}
-        lengths = {}
+        categories: dict[str, int] = {}
+        lengths: dict[str, int] = {}
         total_tokens = 0
 
         for prompt_data in corpus:
-            categories[prompt_data['category']] = categories.get(prompt_data['category'], 0) + 1
-            lengths[prompt_data['target_length']] = lengths.get(prompt_data['target_length'], 0) + 1
-            total_tokens += prompt_data['estimated_tokens']
+            categories[prompt_data["category"]] = categories.get(prompt_data["category"], 0) + 1
+            lengths[prompt_data["target_length"]] = lengths.get(prompt_data["target_length"], 0) + 1
+            total_tokens += prompt_data["estimated_tokens"]
 
-        print(f"\nCorpus Statistics:")
+        print("\nCorpus Statistics:")
         print(f"Categories: {dict(categories)}")
         print(f"Lengths: {dict(lengths)}")
         print(f"Average tokens per prompt: {total_tokens / len(corpus):.1f}")
@@ -231,7 +240,9 @@ class PromptGenerator:
 
 def main():
     """CLI entry point."""
-    parser = argparse.ArgumentParser(description="Generate prompt corpus for inference benchmarking")
+    parser = argparse.ArgumentParser(
+        description="Generate prompt corpus for inference benchmarking"
+    )
     parser.add_argument("--n", type=int, default=500, help="Number of prompts to generate")
     parser.add_argument("--model", default="gpt-4o-mini", help="OpenAI model to use for generation")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")

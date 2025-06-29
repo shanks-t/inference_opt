@@ -309,6 +309,12 @@ dev = [
     { name = "ruff" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "ruff" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.100.0" },
@@ -327,6 +333,12 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.20.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.16.1" },
+    { name = "ruff", specifier = ">=0.12.1" },
+]
 
 [[package]]
 name = "iniconfig"
