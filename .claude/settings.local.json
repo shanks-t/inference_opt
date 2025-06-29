@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.astral.sh)",
+      "Bash(uv init:*)",
+      "Bash(uv run:*)"
+    ],
+    "deny": []
+  }
+}
